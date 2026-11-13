@@ -100,6 +100,12 @@ def marcar_salida_por_dni(payload: MarcarSalidaRequest) -> RegistroOperacionResp
         hora_salida=hora_salida,
         observaciones=payload.observaciones,
     )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo actualizar el horario de salida del registro.",
+        )
+
     return RegistroOperacionResponse(
         mensaje=f"Salida marcada a las {hora_salida} para DNI {payload.dni} ({updated['materia']}).",
         registro=AsistenciaItemResponse(**updated),
