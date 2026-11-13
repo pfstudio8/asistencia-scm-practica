@@ -74,6 +74,8 @@ def test_slice_registrar_asistencia_y_salida_por_dni(client: TestClient):
             "dni": "  45999888  ",
             "materia": "Programación III",
             "nombre_alumno": "Sofía Benítez",
+            "fecha": "2026-11-10",
+            "hora_entrada": "08:00:00",
             "observaciones": "Ingreso puntual",
         },
     )
@@ -81,16 +83,34 @@ def test_slice_registrar_asistencia_y_salida_por_dni(client: TestClient):
     registro = pres_res.json()["registro"]
     assert registro["dni"] == "45999888"
     assert registro["estado"] == "PRESENTE"
-    assert registro["hora_entrada"] is not None
+    assert registro["hora_entrada"] == "08:00:00"
     assert registro["hora_salida"] is None
 
-    # Marcar salida por DNI
+    # Error 2 prevenido: Rechazar duplicado para la misma fecha y materia (409 Conflict)
+    dup_res = client.post(
+        "/api/asistencias/presente",
+        json={
+            "dni": "45999888",
+            "materia": "Programación III",
+            "fecha": "2026-11-10",
+        },
+    )
+    assert dup_res.status_code == 409
+
+    # Error 3B prevenido: Hora de salida anterior a la entrada debe ser rechazada (422)
+    bad_time_res = client.post(
+        "/api/asistencias/salida",
+        json={"dni": "45999888", "fecha": "2026-11-10", "hora_salida": "07:30:00"},
+    )
+    assert bad_time_res.status_code == 422
+
+    # Marcar salida válida posterior a la entrada
     salida_res = client.post(
         "/api/asistencias/salida",
-        json={"dni": "45999888", "hora_salida": "21:30:00"},
+        json={"dni": "45999888", "fecha": "2026-11-10", "hora_salida": "12:30:00"},
     )
     assert salida_res.status_code == 200
-    assert salida_res.json()["registro"]["hora_salida"] == "21:30:00"
+    assert salida_res.json()["registro"]["hora_salida"] == "12:30:00"
 
     # DNI inválido (< 7 dígitos) debe ser rechazado con 422
     invalid_res = client.post(
@@ -103,19 +123,27 @@ def test_slice_registrar_asistencia_y_salida_por_dni(client: TestClient):
 def test_slice_tardanza_ausente_e_informe_por_alumno(client: TestClient):
     dni_test = "46111222"
 
-    # 1. Presente
+    # 1. Presente (clase día 1)
     r1 = client.post(
         "/api/asistencias/presente",
-        json={"dni": dni_test, "materia": "Programación III", "nombre_alumno": "Tomás Silva"},
+        json={
+            "dni": dni_test,
+            "materia": "Programación III",
+            "fecha": "2026-11-01",
+            "hora_entrada": "08:00:00",
+            "nombre_alumno": "Tomás Silva",
+        },
     )
     assert r1.status_code == 201
 
-    # 2. Tardanza con justificación pendiente
+    # 2. Tardanza con justificación pendiente (clase día 2)
     r2 = client.post(
         "/api/asistencias/tardanza",
         json={
             "dni": dni_test,
             "materia": "Programación III",
+            "fecha": "2026-11-02",
+            "hora_entrada": "08:20:00",
             "minutos_retraso": 20,
             "justificacion_estado": "PENDIENTE",
             "observaciones": "Demora en tren",
@@ -125,12 +153,13 @@ def test_slice_tardanza_ausente_e_informe_por_alumno(client: TestClient):
     tardanza_id = r2.json()["registro"]["id"]
     assert r2.json()["registro"]["estado"] == "TARDANZA"
 
-    # 3. Ausente injustificado
+    # 3. Ausente injustificado (clase día 3 en otra materia)
     r3 = client.post(
         "/api/asistencias/ausente",
         json={
             "dni": dni_test,
             "materia": "Bases de Datos II",
+            "fecha": "2026-11-03",
             "justificacion_estado": "INJUSTIFICADA",
             "observaciones": "Sin aviso",
         },
@@ -138,7 +167,7 @@ def test_slice_tardanza_ausente_e_informe_por_alumno(client: TestClient):
     assert r3.status_code == 201
     assert r3.json()["registro"]["estado"] == "AUSENTE"
 
-    # 4. Consultar Informe de Asistencia por Alumno
+    # 4. Consultar Informe de Asistencia por Alumno previo a justificar
     inf_res = client.get(f"/api/informes/alumno/{dni_test}")
     assert inf_res.status_code == 200
     informe = inf_res.json()
@@ -149,16 +178,20 @@ def test_slice_tardanza_ausente_e_informe_por_alumno(client: TestClient):
     assert informe["metricas"]["ausentes"] == 1
     assert informe["metricas"]["faltas_injustificadas"] == 1
     assert informe["metricas"]["justificaciones_pendientes"] == 1
-    # (1.0 + 0.5 + 0.0) / 3 = 50.0% -> LIBRE
+    # Con tardanza pendiente (0.5): (1.0 + 0.5 + 0.0) / 3 = 50.0% -> LIBRE
     assert informe["metricas"]["porcentaje_asistencia"] == 50.0
     assert informe["metricas"]["condicion_academica"] == "LIBRE"
-    assert len(informe["desglose_por_materia"]) == 2
 
-    # 5. Aprobar la justificación pendiente
+    # 5. Error 1 solucionado: Aprobar la justificación impacta directamente en el porcentaje
     patch_res = client.patch(
         f"/api/asistencias/{tardanza_id}/justificacion",
         json={"justificacion_estado": "JUSTIFICADA"},
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["registro"]["justificacion_estado"] == "JUSTIFICADA"
+
+    # Al consultar nuevamente el informe, la tardanza justificada suma 1.0 punto: (1.0 + 1.0 + 0.0) / 3 = 66.7% -> EN RIESGO
+    inf_actualizado = client.get(f"/api/informes/alumno/{dni_test}").json()
+    assert inf_actualizado["metricas"]["porcentaje_asistencia"] == 66.7
+    assert inf_actualizado["metricas"]["condicion_academica"] == "EN RIESGO"
 

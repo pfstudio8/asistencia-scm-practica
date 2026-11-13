@@ -16,12 +16,41 @@ from backend.features.informe_alumno.schemas import (
 from backend.shared.validators import normalizar_dni
 
 
-def _calcular_porcentaje_efectivo(presentes: int, tardanzas: int, total: int) -> float:
-    """Cálculo académico estándar: Presente = 1.0, Tardanza = 0.5 (media falta), Ausente = 0.0."""
+def _calcular_puntaje_registro(registro: dict) -> float:
+    """
+    Asigna puntaje reglamentario según estado y justificación:
+    - PRESENTE: 1.0
+    - TARDANZA JUSTIFICADA: 1.0 (demora avalada por cátedra)
+    - TARDANZA PENDIENTE / INJUSTIFICADA: 0.5 (media falta)
+    - AUSENTE JUSTIFICADA: 1.0 (falta con certificado médico o laboral aprobado)
+    - AUSENTE INJUSTIFICADA / PENDIENTE: 0.0
+    """
+    estado = registro.get("estado")
+    justif = registro.get("justificacion_estado", "NO_APLICA")
+
+    if estado == "PRESENTE":
+        return 1.0
+    if estado == "TARDANZA":
+        return 1.0 if justif == "JUSTIFICADA" else 0.5
+    if estado == "AUSENTE":
+        return 1.0 if justif == "JUSTIFICADA" else 0.0
+    return 0.0
+
+
+def _calcular_porcentaje_registros(registros: list[dict]) -> float:
+    """Calcula el porcentaje efectivo de asistencia considerando incidencias justificadas."""
+    if not registros:
+        return 100.0
+    puntaje_total = sum(_calcular_puntaje_registro(r) for r in registros)
+    return round((puntaje_total / len(registros)) * 100.0, 1)
+
+
+def _calcular_porcentaje_efectivo(presentes: int, tardanzas: int, total: int, justificadas: int = 0) -> float:
+    """Función auxiliar compatible para cálculos rápidos."""
     if total == 0:
         return 100.0
-    puntaje = presentes + (tardanzas * 0.5)
-    return round((puntaje / total) * 100.0, 1)
+    puntaje = presentes + justificadas + (tardanzas * 0.5)
+    return round((min(puntaje, float(total)) / total) * 100.0, 1)
 
 
 def _determinar_condicion(porcentaje: float, total: int) -> str:
@@ -35,11 +64,12 @@ def _determinar_condicion(porcentaje: float, total: int) -> str:
 
 
 def _agrupar_por_materia(registros: list[dict]) -> list[MateriaResumen]:
-    grupos: dict[str, dict[str, int]] = defaultdict(
-        lambda: {"total": 0, "presentes": 0, "tardanzas": 0, "ausentes": 0}
+    grupos: dict[str, dict] = defaultdict(
+        lambda: {"registros": [], "total": 0, "presentes": 0, "tardanzas": 0, "ausentes": 0}
     )
     for r in registros:
         mat = r["materia"]
+        grupos[mat]["registros"].append(r)
         grupos[mat]["total"] += 1
         if r["estado"] == "PRESENTE":
             grupos[mat]["presentes"] += 1
@@ -50,7 +80,7 @@ def _agrupar_por_materia(registros: list[dict]) -> list[MateriaResumen]:
 
     resultado = []
     for materia, stats in sorted(grupos.items(), key=lambda x: x[0]):
-        pct = _calcular_porcentaje_efectivo(stats["presentes"], stats["tardanzas"], stats["total"])
+        pct = _calcular_porcentaje_registros(stats["registros"])
         resultado.append(
             MateriaResumen(
                 materia=materia,
@@ -92,7 +122,7 @@ def generar_informe_por_alumno(dni_raw: str) -> InformeAlumnoResponse:
     justif_pend = sum(1 for r in historial_raw if r["justificacion_estado"] == "PENDIENTE")
     salidas = sum(1 for r in historial_raw if r.get("hora_salida"))
 
-    porcentaje = _calcular_porcentaje_efectivo(presentes, tardanzas, total)
+    porcentaje = _calcular_porcentaje_registros(historial_raw)
     condicion = _determinar_condicion(porcentaje, total)
 
     return InformeAlumnoResponse(
@@ -134,7 +164,7 @@ def obtener_resumen_dashboard() -> DashboardResumenResponse:
         for r in registros
         if r["estado"] == "AUSENTE" and r["justificacion_estado"] == "INJUSTIFICADA"
     )
-    tasa_global = _calcular_porcentaje_efectivo(presentes, tardanzas, total)
+    tasa_global = _calcular_porcentaje_registros(registros)
 
     return DashboardResumenResponse(
         total_registros=total,

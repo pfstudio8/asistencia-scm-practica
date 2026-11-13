@@ -25,6 +25,8 @@ class RegistrarPresenteRequest(BaseModel):
 
 class MarcarSalidaRequest(BaseModel):
     dni: str = Field(..., description="DNI del alumno para marcar su salida")
+    asistencia_id: Optional[int] = Field(default=None, description="ID de registro de asistencia a cerrar (opcional)")
+    fecha: Optional[str] = Field(default=None, description="Fecha ISO YYYY-MM-DD (por defecto hoy)")
     materia: Optional[str] = Field(default=None, max_length=80)
     hora_salida: Optional[str] = Field(default=None, description="Hora HH:MM:SS (opcional)")
     observaciones: Optional[str] = Field(default=None, max_length=240)

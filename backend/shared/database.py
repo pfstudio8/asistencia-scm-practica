@@ -221,3 +221,19 @@ def ensure_alumno_exists(
     created = conn.execute("SELECT * FROM alumnos WHERE dni = ?", (dni,)).fetchone()
     return dict(created)
 
+
+def find_asistencia_duplicada(dni: str, materia: str, fecha: str) -> dict | None:
+    """Verifica si ya existe un registro de asistencia para el alumno en la misma materia y fecha."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, dni, materia, estado, fecha, hora_entrada, hora_salida
+            FROM asistencias
+            WHERE dni = ? AND LOWER(materia) = LOWER(?) AND fecha = ?
+            LIMIT 1
+            """,
+            (dni.strip(), materia.strip(), fecha.strip()),
+        ).fetchone()
+        return dict(row) if row else None
+
+

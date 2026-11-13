@@ -55,32 +55,46 @@ def insert_presente(
         return dict(row)
 
 
-def update_hora_salida(
+def find_open_attendance(
     dni: str,
-    hora_salida: str,
+    fecha: Optional[str] = None,
     materia: Optional[str] = None,
+    asistencia_id: Optional[int] = None,
+) -> Optional[dict]:
+    """Busca una entrada abierta (sin hora_salida registrada) para un alumno."""
+    with get_connection() as conn:
+        if asistencia_id:
+            row = conn.execute(
+                f"{SELECT_ASISTENCIA_JOIN} WHERE a.id = ? AND a.hora_salida IS NULL",
+                (asistencia_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+        clauses = ["a.dni = ?", "a.estado IN ('PRESENTE', 'TARDANZA')", "a.hora_salida IS NULL"]
+        params = [dni.strip()]
+        if fecha:
+            clauses.append("a.fecha = ?")
+            params.append(fecha.strip())
+        if materia and materia.strip():
+            clauses.append("LOWER(a.materia) = LOWER(?)")
+            params.append(materia.strip())
+
+        query = f"{SELECT_ASISTENCIA_JOIN} WHERE {' AND '.join(clauses)} ORDER BY a.fecha DESC, a.id DESC LIMIT 1"
+        row = conn.execute(query, params).fetchone()
+        return dict(row) if row else None
+
+
+def update_hora_salida_by_id(
+    asistencia_id: int,
+    hora_salida: str,
     observaciones: Optional[str] = None,
 ) -> Optional[dict]:
+    """Actualiza la hora de salida de un registro específico."""
     with get_connection() as conn:
-        if materia and materia.strip():
-            target = conn.execute(
-                """
-                SELECT id, observaciones FROM asistencias
-                WHERE dni = ? AND materia = ? AND estado IN ('PRESENTE', 'TARDANZA') AND hora_salida IS NULL
-                ORDER BY id DESC LIMIT 1
-                """,
-                (dni, materia.strip()),
-            ).fetchone()
-        else:
-            target = conn.execute(
-                """
-                SELECT id, observaciones FROM asistencias
-                WHERE dni = ? AND estado IN ('PRESENTE', 'TARDANZA') AND hora_salida IS NULL
-                ORDER BY id DESC LIMIT 1
-                """,
-                (dni,),
-            ).fetchone()
-
+        target = conn.execute(
+            "SELECT id, observaciones FROM asistencias WHERE id = ?",
+            (asistencia_id,),
+        ).fetchone()
         if not target:
             return None
 
@@ -92,10 +106,33 @@ def update_hora_salida(
 
         conn.execute(
             "UPDATE asistencias SET hora_salida = ?, observaciones = ? WHERE id = ?",
-            (hora_salida, nueva_obs, target["id"]),
+            (hora_salida, nueva_obs, asistencia_id),
         )
-        row = conn.execute(f"{SELECT_ASISTENCIA_JOIN} WHERE a.id = ?", (target["id"],)).fetchone()
-        return dict(row)
+        row = conn.execute(f"{SELECT_ASISTENCIA_JOIN} WHERE a.id = ?", (asistencia_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def update_hora_salida(
+    dni: str,
+    hora_salida: str,
+    materia: Optional[str] = None,
+    observaciones: Optional[str] = None,
+    fecha: Optional[str] = None,
+    asistencia_id: Optional[int] = None,
+) -> Optional[dict]:
+    target = find_open_attendance(
+        dni=dni,
+        fecha=fecha,
+        materia=materia,
+        asistencia_id=asistencia_id,
+    )
+    if not target:
+        return None
+    return update_hora_salida_by_id(
+        asistencia_id=target["id"],
+        hora_salida=hora_salida,
+        observaciones=observaciones,
+    )
 
 
 def list_asistencias(

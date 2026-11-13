@@ -554,7 +554,7 @@ async function refreshFullAttendanceLog() {
               <div style="display:flex; gap:6px;">
                 ${
                   canMarkExit
-                    ? `<button type="button" class="btn btn-sky btn-sm" data-exit-dni="${escapeHtml(r.dni)}">⇥ Salida</button>`
+                    ? `<button type="button" class="btn btn-sky btn-sm" data-exit-dni="${escapeHtml(r.dni)}" data-exit-id="${r.id}" data-exit-fecha="${escapeHtml(r.fecha)}">⇥ Salida</button>`
                     : ""
                 }
                 <button type="button" class="btn btn-outline-navy btn-sm" data-open-report="${escapeHtml(r.dni)}">Informe</button>
@@ -568,7 +568,11 @@ async function refreshFullAttendanceLog() {
     tbody.querySelectorAll("[data-exit-dni]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         try {
-          const res = await api.marcarSalida({ dni: btn.dataset.exitDni });
+          const res = await api.marcarSalida({
+            dni: btn.dataset.exitDni,
+            asistencia_id: Number(btn.dataset.exitId),
+            fecha: btn.dataset.exitFecha,
+          });
           notify({ type: "info", title: "Salida Marcada", message: res.mensaje });
           await refreshAllData();
         } catch (error) {

@@ -12,6 +12,7 @@ from backend.features.tardanzas_ausencias.schemas import (
     RegistrarTardanzaRequest,
     RevisarJustificacionRequest,
 )
+from backend.shared.database import find_asistencia_duplicada
 
 
 def registrar_tardanza(payload: RegistrarTardanzaRequest) -> IncidenciaOperacionResponse:
@@ -19,6 +20,17 @@ def registrar_tardanza(payload: RegistrarTardanzaRequest) -> IncidenciaOperacion
     fecha = payload.fecha or now.date().isoformat()
     hora_entrada = payload.hora_entrada or now.strftime("%H:%M:%S")
     materia = payload.materia.strip() or "Programación III"
+
+    # Prevenir registros duplicados o contradictorios en el mismo día
+    existente = find_asistencia_duplicada(payload.dni, materia, fecha)
+    if existente:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"El alumno con DNI {payload.dni} ya registra asistencia "
+                f"({existente['estado']}) para '{materia}' en la fecha {fecha}."
+            ),
+        )
 
     created = repository.insert_tardanza(
         dni=payload.dni,
@@ -44,6 +56,17 @@ def registrar_tardanza(payload: RegistrarTardanzaRequest) -> IncidenciaOperacion
 def registrar_ausente(payload: RegistrarAusenteRequest) -> IncidenciaOperacionResponse:
     fecha = payload.fecha or datetime.now().date().isoformat()
     materia = payload.materia.strip() or "Programación III"
+
+    # Prevenir registros duplicados o contradictorios en el mismo día
+    existente = find_asistencia_duplicada(payload.dni, materia, fecha)
+    if existente:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"El alumno con DNI {payload.dni} ya registra asistencia "
+                f"({existente['estado']}) para '{materia}' en la fecha {fecha}."
+            ),
+        )
 
     created = repository.insert_ausente(
         dni=payload.dni,
