@@ -14,3 +14,8 @@
 ## [2.1.0] - 2026-09-10
 ### Added
 - Función `obtener_reporte_estadistico` para extraer resumen de métricas e historial de asistencias.
+## [3.0.0] - 2026-11-05
+### Added
+- Sistema Web completo de Asistencia con Backend **FastAPI** estructurado bajo **Vertical Slicing** (`auth`, `alumnos`, `registrar_asistencia`, `tardanzas_ausencias`, `informe_alumno`) y persistencia SQLite.
+- Endpoints REST para registrar entrada/salida por DNI, tardanzas, ausencias, revisión de justificaciones e informe integral por alumno.
+- Frontend en HTML, CSS y JS con paleta institucional WCAG AAA, tipografías `Sora` y `Plus Jakarta Sans`, Dashboard interactiva, Login/Register con loaders sólidos de ~0.7s, persistencia de `username` en `localStorage` y notificaciones sólidas animadas con Framer Motion DOM (sin glassmorphism ni fades).

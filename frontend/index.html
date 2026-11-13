@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SICA · Sistema Institucional de Control de Asistencia</title>
+  <!-- Tipografías distintivas de alta legibilidad: Sora (encabezados), Plus Jakarta Sans (interfaz/tablas) y JetBrains Mono (DNI/horarios) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <!-- CONTENEDOR DE NOTIFICACIONES SÓLIDAS (Framer Motion · Sin Glassmorphism · Sin Fades) -->
+  <div id="notification-stack" class="notification-stack" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- LOADER DE TRANSICIÓN DE SESIÓN (~0.7s SÓLIDO AL INICIAR SESIÓN Y AL SALIR) -->
+  <div id="session-loader" class="session-loader hidden" role="status" aria-live="assertive">
+    <div class="loader-card">
+      <div class="loader-emblem">
+        <div class="loader-spinner-ring"></div>
+        <span class="loader-acronym">SICA</span>
+      </div>
+      <h2 id="loader-title" class="loader-title">Iniciando sesión institucional...</h2>
+      <p id="loader-subtitle" class="loader-subtitle">Sincronizando panel y credenciales de usuario</p>
+      <div class="loader-track">
+        <div id="loader-bar" class="loader-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PANTALLA DE AUTENTICACIÓN (LOGIN & REGISTER)                          -->
+  <!-- ===================================================================== -->
+  <main id="auth-screen" class="auth-screen">
+    <section class="auth-brand-panel">
+      <div class="brand-top">
+        <div class="brand-badge">SCM · VERSIÓN 3.0 · FASTAPI</div>
+        <div class="brand-logo-row">
+          <div class="brand-mark">A✓</div>
+          <div>
+            <h1 class="brand-name">SICA Institucional</h1>
+            <p class="brand-tagline">Sistema Integral de Control de Asistencia Académica</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="brand-highlights">
+        <div class="highlight-item">
+          <span class="highlight-dot dot-present"></span>
+          <div>
+            <strong>Marcación Inmediata por DNI</strong>
+            <p>Registro validado de entrada, salida, presente, tardanzas y ausencias en tiempo real.</p>
+          </div>
+        </div>
+        <div class="highlight-item">
+          <span class="highlight-dot dot-late"></span>
+          <div>
+            <strong>Seguimiento de Tardanzas y Justificaciones</strong>
+            <p>Control de minutos de retraso y bandeja de revisión de certificados pendientes.</p>
+          </div>
+        </div>
+        <div class="highlight-item">
+          <span class="highlight-dot dot-primary"></span>
+          <div>
+            <strong>Informes Detallados por Alumno</strong>
+            <p>Cálculo automático de condición académica, porcentaje efectivo y desglose por materia.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-credentials-box">
+        <div class="demo-credentials-info">
+          <span class="demo-label">ACCESO RÁPIDO DE DEMOSTRACIÓN</span>
+          <p>Usuario: <code>docente.scm</code> &nbsp;|&nbsp; Clave: <code>admin123</code></p>
+        </div>
+        <button type="button" id="btn-fill-demo" class="btn btn-secondary-solid">
+          Autocompletar Demo
+        </button>
+      </div>
+    </section>
+
+    <section class="auth-form-panel">
+      <div class="auth-card">
+        <div class="auth-tabs" role="tablist" aria-label="Acceso al sistema">
+          <button
+            type="button"
+            id="tab-login"
+            class="auth-tab active"
+            role="tab"
+            aria-selected="true"
+          >
+            Iniciar Sesión
+          </button>
+          <button
+            type="button"
+            id="tab-register"
+            class="auth-tab"
+            role="tab"
+            aria-selected="false"
+          >
+            Crear Cuenta
+          </button>
+        </div>
+
+        <!-- FORMULARIO LOGIN -->
+        <form id="login-form" class="auth-form" autocomplete="on">
+          <div class="auth-header">
+            <h2>Acceso Docente y Preceptoría</h2>
+            <p>Ingresá tus credenciales institucionales para acceder a la dashboard.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="login-username">Nombre de Usuario o Correo</label>
+            <input
+              type="text"
+              id="login-username"
+              name="username"
+              placeholder="Ej. docente.scm"
+              required
+              minlength="2"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Contraseña</label>
+            <input
+              type="password"
+              id="login-password"
+              name="password"
+              placeholder="Ingresá tu contraseña"
+              required
+              minlength="4"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            Ingresar al Sistema
+          </button>
+        </form>
+
+        <!-- FORMULARIO REGISTRO -->
+        <form id="register-form" class="auth-form hidden" autocomplete="on">
+          <div class="auth-header">
+            <h2>Registro de Cuenta Institucional</h2>
+            <p>Creá tu usuario para gestionar asistencias e informes académicos.</p>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="reg-username">Usuario (sin espacios)</label>
+              <input
+                type="text"
+                id="reg-username"
+                name="username"
+                placeholder="Ej. prof.garcia"
+                required
+                minlength="3"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="reg-rol">Cargo Institucional</label>
+              <select id="reg-rol" name="rol">
+                <option value="Docente Titular">Docente Titular</option>
+                <option value="Preceptor/a">Preceptor/a</option>
+                <option value="Coordinador de Cátedra">Coordinador de Cátedra</option>
+                <option value="Auxiliar Docente">Auxiliar Docente</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-fullname">Nombre y Apellido Completo</label>
+            <input
+              type="text"
+              id="reg-fullname"
+              name="nombre_completo"
+              placeholder="Ej. Lic. Mariana García"
+              required
+              minlength="3"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="reg-email">Correo Electrónico Institucional</label>
+            <input
+              type="email"
+              id="reg-email"
+              name="email"
+              placeholder="mgarcia@instituto-scm.edu.ar"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="reg-password">Contraseña (mínimo 4 caracteres)</label>
+            <input
+              type="password"
+              id="reg-password"
+              name="password"
+              placeholder="Definí una contraseña segura"
+              required
+              minlength="4"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            Registrar Usuario e Ingresar
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- APLICACIÓN PRINCIPAL · SIDEBAR INSTITUCIONAL + DASHBOARD              -->
+  <!-- ===================================================================== -->
+  <div id="app-shell" class="app-shell hidden">
+    <!-- SIDEBAR INSTITUCIONAL (#0F172A / #1E293B) -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">A✓</div>
+        <div>
+          <span class="sidebar-title">SICA Web</span>
+          <span class="sidebar-sub">Control de Asistencia</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navegación principal">
+        <span class="nav-section-label">GESTIÓN ACADÉMICA</span>
+        <button type="button" class="nav-btn active" data-view="dashboard">
+          <span class="nav-indicator"></span>
+          <span class="nav-icon">▣</span>
+          <span>Dashboard General</span>
+        </button>
+        <button type="button" class="nav-btn" data-view="registro">
+          <span class="nav-indicator"></span>
+          <span class="nav-icon">⊕</span>
+          <span>Registrar por DNI</span>
+        </button>
+        <button type="button" class="nav-btn" data-view="informe">
+          <span class="nav-indicator"></span>
+          <span class="nav-icon">▤</span>
+          <span>Informe por Alumno</span>
+        </button>
+        <button type="button" class="nav-btn" data-view="alumnos">
+          <span class="nav-indicator"></span>
+          <span class="nav-icon">☷</span>
+          <span>Padrón de Alumnos</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-session-box">
+          <div class="user-avatar" id="sidebar-avatar">U</div>
+          <div class="user-meta">
+            <strong id="sidebar-username">usuario</strong>
+            <span id="sidebar-role">Docente</span>
+          </div>
+        </div>
+        <button type="button" id="btn-logout" class="btn btn-logout">
+          Cerrar Sesión
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="workspace">
+      <!-- ENCABEZADO SUPERIOR + MENSAJE DE BIENVENIDA CON USERNAME DE LOCALSTORAGE -->
+      <header class="topbar">
+        <div class="welcome-block">
+          <span class="welcome-eyebrow" id="current-date-label">CICLO LECTIVO 2026</span>
+          <h1 class="welcome-heading">
+            ¡Bienvenido/a, <span id="welcome-username" class="welcome-highlight">docente</span>!
+          </h1>
+          <p class="welcome-subtext" id="welcome-subtext">
+            Sesión activa guardada localmente · Panel de monitoreo de entradas, salidas e incidencias.
+          </p>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="live-clock-chip">
+            <span class="clock-dot"></span>
+            <span id="live-clock" class="mono-text">--:--:--</span>
+          </div>
+          <button type="button" id="btn-refresh-all" class="btn btn-outline-navy">
+            ↻ Actualizar Datos
+          </button>
+        </div>
+      </header>
+
+      <!-- ================================================================= -->
+      <!-- VISTA 1: DASHBOARD GENERAL                                        -->
+      <!-- ================================================================= -->
+      <section id="view-dashboard" class="view-section">
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <article class="kpi-card kpi-primary">
+            <div class="kpi-top">
+              <span class="kpi-label">TASA DE ASISTENCIA</span>
+              <span class="kpi-tag tag-blue">Global</span>
+            </div>
+            <div class="kpi-value mono-text" id="kpi-tasa">0%</div>
+            <p class="kpi-foot"><span id="kpi-total-registros">0</span> registros totales en actas</p>
+          </article>
+
+          <article class="kpi-card kpi-present">
+            <div class="kpi-top">
+              <span class="kpi-label">PRESENTES</span>
+              <span class="kpi-tag tag-green">En término</span>
+            </div>
+            <div class="kpi-value mono-text" id="kpi-presentes">0</div>
+            <p class="kpi-foot">Confirmaciones de entrada válidas</p>
+          </article>
+
+          <article class="kpi-card kpi-late">
+            <div class="kpi-top">
+              <span class="kpi-label">TARDANZAS / RETRASOS</span>
+              <span class="kpi-tag tag-amber">Media falta</span>
+            </div>
+            <div class="kpi-value mono-text" id="kpi-tardanzas">0</div>
+            <p class="kpi-foot"><span id="kpi-pendientes">0</span> justificaciones por revisar</p>
+          </article>
+
+          <article class="kpi-card kpi-absent">
+            <div class="kpi-top">
+              <span class="kpi-label">AUSENCIAS / FALTAS</span>
+              <span class="kpi-tag tag-red">Alerta</span>
+            </div>
+            <div class="kpi-value mono-text" id="kpi-ausentes">0</div>
+            <p class="kpi-foot"><span id="kpi-injustificadas">0</span> faltas no justificadas</p>
+          </article>
+        </div>
+
+        <!-- TERMINAL RÁPIDA DE MARCACIÓN POR DNI + DESGLOSE POR MATERIA -->
+        <div class="dashboard-main-grid">
+          <!-- TERMINAL RÁPIDA -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Terminal Rápida de Marcación por DNI</h2>
+                <p class="panel-subtitle">Registrá entrada, salida, tardanza o ausencia al instante</p>
+              </div>
+              <span class="status-pill pill-blue">DNI &ge; 7 dígitos</span>
+            </div>
+
+            <form id="quick-dni-form" class="quick-dni-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="quick-dni">DNI del Alumno</label>
+                  <input
+                    type="text"
+                    id="quick-dni"
+                    class="mono-input"
+                    placeholder="Ej. 40123456"
+                    inputmode="numeric"
+                    maxlength="10"
+                    required
+                  />
+                  <small id="quick-student-preview" class="student-preview-hint">
+                    Ingresá un DNI del padrón (ej. 40123456) o uno nuevo para alta automática.
+                  </small>
+                </div>
+
+                <div class="form-group">
+                  <label for="quick-materia">Materia / Cátedra</label>
+                  <select id="quick-materia">
+                    <option value="Programación III">Programación III</option>
+                    <option value="Gestión de Configuración (SCM)">Gestión de Configuración (SCM)</option>
+                    <option value="Bases de Datos II">Bases de Datos II</option>
+                    <option value="Arquitectura de Sistemas">Arquitectura de Sistemas</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="quick-obs">Observación / Nota de Acta (Opcional)</label>
+                <input
+                  type="text"
+                  id="quick-obs"
+                  placeholder="Ej. Ingreso puntual / Demora en subte / Sin aviso"
+                />
+              </div>
+
+              <div class="quick-actions-grid">
+                <button type="button" id="btn-quick-entrada" class="btn btn-primary">
+                  ✓ Registrar Entrada
+                </button>
+                <button type="button" id="btn-quick-salida" class="btn btn-sky">
+                  ⇥ Marcar Salida
+                </button>
+                <button type="button" id="btn-quick-tardanza" class="btn btn-amber">
+                  ⏱ Marcar Tardanza
+                </button>
+                <button type="button" id="btn-quick-ausente" class="btn btn-danger">
+                  ✕ Marcar Ausente
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- ASISTENCIA POR MATERIA -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Cobertura por Materia</h2>
+                <p class="panel-subtitle">Porcentaje efectivo por asignatura activa</p>
+              </div>
+              <span class="status-pill pill-navy"><span id="kpi-total-alumnos">0</span> alumnos</span>
+            </div>
+            <div id="materia-breakdown-list" class="materia-list"></div>
+          </div>
+        </div>
+
+        <!-- JUSTIFICACIONES PENDIENTES DE REVISIÓN (#F59E0B) -->
+        <div class="panel-card" id="pending-justifications-card">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Justificaciones Pendientes de Revisión</h2>
+              <p class="panel-subtitle">Tardanzas o inasistencias con documentación a validar por cátedra</p>
+            </div>
+            <span class="status-pill pill-late" id="pending-badge-count">0 pendientes</span>
+          </div>
+          <div id="pending-list-container" class="pending-list"></div>
+        </div>
+
+        <!-- ÚLTIMOS REGISTROS DE ASISTENCIA -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Actividad Reciente de Asistencia</h2>
+              <p class="panel-subtitle">Últimas marcaciones registradas en la institución</p>
+            </div>
+            <button type="button" class="btn btn-outline-navy btn-sm" id="btn-goto-registro">
+              Ver Historial Completo →
+            </button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>DNI</th>
+                  <th>Alumno</th>
+                  <th>Materia</th>
+                  <th>Fecha</th>
+                  <th>Entrada</th>
+                  <th>Salida</th>
+                  <th>Estado</th>
+                  <th>Justificación</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-recent-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VISTA 2: REGISTRO OPERATIVO POR DNI (PRESENTE / TARDANZA / AUSENTE)-->
+      <!-- ================================================================= -->
+      <section id="view-registro" class="view-section hidden">
+        <div class="two-col-forms">
+          <!-- FORMULARIO ENTRADA / SALIDA -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">1. Asistencia Regular (Entrada / Salida)</h2>
+                <p class="panel-subtitle">Registrá ingreso en estado Presente o marcá el horario de salida</p>
+              </div>
+              <span class="status-pill pill-present">Presente</span>
+            </div>
+
+            <form id="form-presente-dni" class="stacked-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="pres-dni">DNI del Alumno *</label>
+                  <input
+                    type="text"
+                    id="pres-dni"
+                    class="mono-input"
+                    placeholder="Ej. 40123456"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="pres-materia">Materia *</label>
+                  <select id="pres-materia">
+                    <option value="Programación III">Programación III</option>
+                    <option value="Gestión de Configuración (SCM)">Gestión de Configuración (SCM)</option>
+                    <option value="Bases de Datos II">Bases de Datos II</option>
+                    <option value="Arquitectura de Sistemas">Arquitectura de Sistemas</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="pres-nombre">Nombre y Apellido (solo si el DNI no está en padrón)</label>
+                <input
+                  type="text"
+                  id="pres-nombre"
+                  placeholder="Opcional: Ej. Tomás Herrera"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="pres-obs">Observaciones</label>
+                <input
+                  type="text"
+                  id="pres-obs"
+                  value="Ingreso registrado en término"
+                />
+              </div>
+
+              <div class="button-pair">
+                <button type="submit" class="btn btn-primary">
+                  ✓ Registrar Entrada (Presente)
+                </button>
+                <button type="button" id="btn-form-salida" class="btn btn-sky">
+                  ⇥ Marcar Salida por DNI
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- FORMULARIO TARDANZA Y AUSENTE -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">2. Registrar Tardanza o Ausencia</h2>
+                <p class="panel-subtitle">Asentá llegadas tarde o faltas justificadas / injustificadas</p>
+              </div>
+              <span class="status-pill pill-late">Incidencias</span>
+            </div>
+
+            <form id="form-incidencia-dni" class="stacked-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="inc-dni">DNI del Alumno *</label>
+                  <input
+                    type="text"
+                    id="inc-dni"
+                    class="mono-input"
+                    placeholder="Ej. 41555890"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="inc-tipo">Tipo de Incidencia *</label>
+                  <select id="inc-tipo">
+                    <option value="TARDANZA">Tardanza / Retraso (#F59E0B)</option>
+                    <option value="AUSENTE">Ausente / Falta (#EF4444)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="inc-materia">Materia *</label>
+                  <select id="inc-materia">
+                    <option value="Programación III">Programación III</option>
+                    <option value="Gestión de Configuración (SCM)">Gestión de Configuración (SCM)</option>
+                    <option value="Bases de Datos II">Bases de Datos II</option>
+                    <option value="Arquitectura de Sistemas">Arquitectura de Sistemas</option>
+                  </select>
+                </div>
+
+                <div class="form-group" id="group-minutos-retraso">
+                  <label for="inc-minutos">Minutos de Retraso</label>
+                  <input type="number" id="inc-minutos" min="1" max="240" value="15" />
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="inc-justificacion">Estado de Justificación</label>
+                  <select id="inc-justificacion">
+                    <option value="PENDIENTE">Pendiente de revisión</option>
+                    <option value="INJUSTIFICADA">No justificada</option>
+                    <option value="JUSTIFICADA">Justificada con constancia</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="inc-nombre">Nombre (si es nuevo DNI)</label>
+                  <input type="text" id="inc-nombre" placeholder="Opcional" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="inc-obs">Motivo / Detalle de Incidencia</label>
+                <input
+                  type="text"
+                  id="inc-obs"
+                  placeholder="Ej. Demora en transporte / Ausencia sin aviso"
+                  required
+                />
+              </div>
+
+              <button type="submit" id="btn-submit-incidencia" class="btn btn-amber btn-block">
+                Registrar Tardanza en Actas
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- TABLA FILTRABLE DE TODOS LOS REGISTROS -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Planilla General de Asistencias</h2>
+              <p class="panel-subtitle">Filtrá por DNI, materia o estado de marcación</p>
+            </div>
+            <div class="filter-bar">
+              <input
+                type="text"
+                id="filter-dni"
+                class="mono-input input-sm"
+                placeholder="Filtrar DNI..."
+              />
+              <select id="filter-estado" class="input-sm">
+                <option value="">Todos los estados</option>
+                <option value="PRESENTE">Presente</option>
+                <option value="TARDANZA">Tardanza</option>
+                <option value="AUSENTE">Ausente</option>
+              </select>
+              <select id="filter-materia" class="input-sm">
+                <option value="">Todas las materias</option>
+                <option value="Programación III">Programación III</option>
+                <option value="Gestión de Configuración (SCM)">Gestión de Configuración (SCM)</option>
+                <option value="Bases de Datos II">Bases de Datos II</option>
+                <option value="Arquitectura de Sistemas">Arquitectura de Sistemas</option>
+              </select>
+              <button type="button" id="btn-apply-filters" class="btn btn-primary btn-sm">
+                Filtrar
+              </button>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>DNI</th>
+                  <th>Alumno</th>
+                  <th>Materia</th>
+                  <th>Fecha</th>
+                  <th>Entrada</th>
+                  <th>Salida</th>
+                  <th>Estado</th>
+                  <th>Justificación</th>
+                  <th>Observaciones</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="full-log-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VISTA 3: INFORME DE ASISTENCIA POR ALUMNO                         -->
+      <!-- ================================================================= -->
+      <section id="view-informe" class="view-section hidden">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Emitir Informe de Asistencia por Alumno</h2>
+              <p class="panel-subtitle">Consultá métricas individuales, regularidad, tardanzas y ausencias por DNI</p>
+            </div>
+          </div>
+
+          <form id="form-search-informe" class="report-search-bar">
+            <input
+              type="text"
+              id="report-dni-input"
+              class="mono-input"
+              placeholder="Ingresá el DNI del alumno (ej. 40123456)"
+              required
+            />
+            <button type="submit" class="btn btn-primary">
+              Consultar Informe por DNI
+            </button>
+            <button type="button" id="btn-export-report-csv" class="btn btn-outline-navy hidden">
+              ⬇ Exportar CSV del Alumno
+            </button>
+          </form>
+
+          <div class="quick-chips-wrapper">
+            <span class="chips-label">Selección rápida del padrón:</span>
+            <div id="student-quick-chips" class="chips-list"></div>
+          </div>
+        </div>
+
+        <!-- CONTENEDOR RESULTADO DEL INFORME -->
+        <div id="report-result-container" class="report-result hidden">
+          <div class="panel-card report-student-banner">
+            <div class="student-banner-main">
+              <div class="student-initials" id="rep-initials">VG</div>
+              <div>
+                <div class="student-title-row">
+                  <h2 id="rep-nombre">Nombre del Alumno</h2>
+                  <span id="rep-condicion-badge" class="status-pill pill-present">REGULAR</span>
+                </div>
+                <p class="student-meta-row">
+                  <span>DNI: <strong class="mono-text" id="rep-dni">-</strong></span>
+                  <span>•</span>
+                  <span>Legajo: <strong class="mono-text" id="rep-legajo">-</strong></span>
+                  <span>•</span>
+                  <span>Curso: <strong id="rep-curso">-</strong></span>
+                  <span>•</span>
+                  <span id="rep-email">-</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="student-percentage-box">
+              <span class="pct-caption">ASISTENCIA EFECTIVA</span>
+              <strong class="pct-big mono-text" id="rep-pct">0%</strong>
+              <small>Presente 100% · Tardanza 50%</small>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <article class="kpi-card kpi-primary">
+              <span class="kpi-label">CLASES COMPUTADAS</span>
+              <div class="kpi-value mono-text" id="rep-total">0</div>
+              <p class="kpi-foot"><span id="rep-salidas">0</span> salidas registradas</p>
+            </article>
+            <article class="kpi-card kpi-present">
+              <span class="kpi-label">PRESENTES</span>
+              <div class="kpi-value mono-text" id="rep-presentes">0</div>
+              <p class="kpi-foot">Asistencias puntuales</p>
+            </article>
+            <article class="kpi-card kpi-late">
+              <span class="kpi-label">TARDANZAS</span>
+              <div class="kpi-value mono-text" id="rep-tardanzas">0</div>
+              <p class="kpi-foot"><span id="rep-pendientes">0</span> justif. pendientes</p>
+            </article>
+            <article class="kpi-card kpi-absent">
+              <span class="kpi-label">AUSENCIAS</span>
+              <div class="kpi-value mono-text" id="rep-ausentes">0</div>
+              <p class="kpi-foot"><span id="rep-injustificadas">0</span> faltas injustificadas</p>
+            </article>
+          </div>
+
+          <div class="dashboard-main-grid">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Rendimiento por Materia del Alumno</h3>
+              </div>
+              <div id="rep-materias-list" class="materia-list"></div>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Criterio Reglamentario Aplicado</h3>
+              </div>
+              <ul class="rules-list">
+                <li><span class="status-pill pill-present">REGULAR (&ge; 75%)</span> Habilitado/a para instancias de promoción o examen regular.</li>
+                <li><span class="status-pill pill-late">EN RIESGO (60% - 74.9%)</span> Requiere seguimiento de preceptoría y justificación documental.</li>
+                <li><span class="status-pill pill-absent">LIBRE (&lt; 60%)</span> Superó el límite reglamentario de inasistencias acumuladas.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <h3 class="panel-title">Historial Cronológico del Alumno</h3>
+            </div>
+            <div class="table-wrapper">
+              <table class="attendance-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Materia</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Estado</th>
+                    <th>Retraso</th>
+                    <th>Justificación</th>
+                    <th>Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-historial-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VISTA 4: PADRÓN DE ALUMNOS                                        -->
+      <!-- ================================================================= -->
+      <section id="view-alumnos" class="view-section hidden">
+        <div class="two-col-forms alumnos-layout">
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Alta / Actualización de Alumno</h2>
+                <p class="panel-subtitle">Asociá nombre, legajo y comisión a un DNI</p>
+              </div>
+            </div>
+
+            <form id="form-nuevo-alumno" class="stacked-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="alu-dni">DNI *</label>
+                  <input type="text" id="alu-dni" class="mono-input" placeholder="Ej. 45123789" required />
+                </div>
+                <div class="form-group">
+                  <label for="alu-legajo">Legajo (Opcional)</label>
+                  <input type="text" id="alu-legajo" class="mono-input" placeholder="Auto: LEG-2026-XXXX" />
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="alu-nombre">Nombre *</label>
+                  <input type="text" id="alu-nombre" placeholder="Ej. Julián" required />
+                </div>
+                <div class="form-group">
+                  <label for="alu-apellido">Apellido *</label>
+                  <input type="text" id="alu-apellido" placeholder="Ej. Álvarez" required />
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="alu-curso">Curso / Comisión</label>
+                  <input type="text" id="alu-curso" value="3° Año - Comisión A" required />
+                </div>
+                <div class="form-group">
+                  <label for="alu-email">Correo Institucional</label>
+                  <input type="email" id="alu-email" placeholder="jalvarez@alu.scm.edu.ar" />
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                Guardar Alumno en Padrón
+              </button>
+            </form>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Alumnos Registrados</h2>
+                <p class="panel-subtitle">Seleccioná cualquier alumno para emitir su informe de asistencia</p>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="attendance-table">
+                <thead>
+                  <tr>
+                    <th>DNI</th>
+                    <th>Alumno</th>
+                    <th>Legajo</th>
+                    <th>Curso</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="alumnos-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

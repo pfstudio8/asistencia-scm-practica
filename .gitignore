@@ -1,0 +1,16 @@
+# Entorno virtual de Python
+.venv/
+venv/
+ENV/
+
+# Caché de Python y tests
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Base de datos SQLite local generada en ejecución
+backend/data/*.db
+backend/data/*.db-journal
+*.sqlite3
+
